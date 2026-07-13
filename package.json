@@ -1,0 +1,39 @@
+{
+  "name": "pergunte-ao-estatuto",
+  "version": "0.1.0",
+  "description": "RAG anti-alucinacao sobre estatutos e regulamentos: cita o artigo em toda afirmacao e recusa responder quando a base nao cobre a pergunta.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Vicente Moura",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "pergunte-ao-estatuto": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "cli": "tsx src/cli.ts",
+    "start:api": "tsx src/api.ts"
+  },
+  "keywords": [
+    "rag",
+    "llm",
+    "estatuto",
+    "anti-alucinacao"
+  ],
+  "dependencies": {
+    "@xenova/transformers": "^2.17.2",
+    "fastify": "^5.10.0",
+    "neo4j-driver": "^6.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
