@@ -58,4 +58,22 @@ describe('ask', () => {
     expect(result.citations).toEqual([]);
     expect(llm.calls).toHaveLength(0);
   });
+
+  it('recusa (fail-closed) quando o LLM cita um artigo fora do contexto recuperado', async () => {
+    const { store, embedder } = await setup({
+      'Art. 1º O objetivo da associacao e representar os moradores do bairro.': [1, 0, 0],
+      'Art. 2º Sao direitos dos associados votar e ser votado nas assembleias.': [0, 1, 0],
+      'Art. 3º Sao deveres dos associados pagar a contribuicao mensal em dia.': [0, 0, 1],
+      [QUESTION_SOBRE_DIREITOS]: [0, 1, 0],
+    });
+    // Artigo 9º nao existe no estatuto e nao foi recuperado: citacao invalida.
+    const llm = new FakeLLM('Isso esta previsto no [Art. 9º] do estatuto.');
+
+    const result = await ask(QUESTION_SOBRE_DIREITOS, { embedder, store, llm });
+
+    expect(result.refused).toBe(true);
+    expect(result.answer).toBe(REFUSAL_MESSAGE);
+    expect(result.citations).toEqual([]);
+    expect(llm.calls).toHaveLength(1);
+  });
 });

@@ -1,3 +1,4 @@
+import { extractCitedArticles, hasOnlyValidCitations } from '../domain/citations.js';
 import type { Embedder, LLM, VectorStore, VectorStoreResult } from './ports.js';
 
 export const REFUSAL_MESSAGE = 'Não encontrei base no documento para responder isso.';
@@ -28,16 +29,6 @@ export interface AskResult {
   answer: string;
   citations: Citation[];
   refused: boolean;
-}
-
-const CITATION_PATTERN = /\[Art\.\s*(\d+º?)\]/g;
-
-function extractCitedArticles(answer: string): string[] {
-  const cited = new Set<string>();
-  for (const match of answer.matchAll(CITATION_PATTERN)) {
-    cited.add(match[1]);
-  }
-  return [...cited];
 }
 
 function buildPrompt(question: string, context: VectorStoreResult[]): string {
@@ -79,6 +70,12 @@ export async function ask(question: string, deps: AskDeps): Promise<AskResult> {
 
   const prompt = buildPrompt(question, retrieved);
   const answer = await llm.generate(prompt);
+
+  const availableArticles = retrieved.map((chunk) => chunk.article);
+  if (!hasOnlyValidCitations(answer, availableArticles)) {
+    // O LLM citou um artigo fora do contexto (ou nao citou nenhum): recusa, fail-closed.
+    return refusal();
+  }
 
   const citedArticles = extractCitedArticles(answer);
   const citations: Citation[] = retrieved
