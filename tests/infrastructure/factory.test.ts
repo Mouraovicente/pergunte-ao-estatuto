@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLLM, createStore } from '../../src/infrastructure/factory.js';
 import { MemoryVectorStore } from '../../src/infrastructure/memory-store.js';
+import { Neo4jVectorStore } from '../../src/infrastructure/neo4j-store.js';
 import { OpenRouterLLM } from '../../src/infrastructure/openrouter.js';
 import { TemplateFakeLLM } from '../../src/infrastructure/fake-llm.js';
 
@@ -11,6 +12,12 @@ describe('createStore', () => {
 
   it('retorna MemoryVectorStore quando VECTOR_STORE=memory', () => {
     expect(createStore({ VECTOR_STORE: 'memory' })).toBeInstanceOf(MemoryVectorStore);
+  });
+
+  it('retorna Neo4jVectorStore quando VECTOR_STORE=neo4j', () => {
+    expect(
+      createStore({ VECTOR_STORE: 'neo4j', NEO4J_URI: 'bolt://localhost:7687' }),
+    ).toBeInstanceOf(Neo4jVectorStore);
   });
 });
 

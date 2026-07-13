@@ -1,5 +1,6 @@
 import type { LLM, VectorStore } from '../application/ports.js';
 import { MemoryVectorStore } from './memory-store.js';
+import { Neo4jVectorStore } from './neo4j-store.js';
 import { OpenRouterLLM } from './openrouter.js';
 import { TemplateFakeLLM } from './fake-llm.js';
 
@@ -10,8 +11,14 @@ export type EnvLike = Record<string, string | undefined>;
  * VECTOR_STORE ("memory" | "neo4j"). Por padrao usa o store in-memory,
  * que nao exige nenhuma dependencia externa.
  */
-export function createStore(_env: EnvLike = process.env): VectorStore {
-  // O modo VECTOR_STORE=neo4j e adicionado por src/infrastructure/neo4j-store.ts.
+export function createStore(env: EnvLike = process.env): VectorStore {
+  if (env.VECTOR_STORE === 'neo4j') {
+    return new Neo4jVectorStore({
+      uri: env.NEO4J_URI,
+      user: env.NEO4J_USER,
+      password: env.NEO4J_PASSWORD,
+    });
+  }
   return new MemoryVectorStore();
 }
 
