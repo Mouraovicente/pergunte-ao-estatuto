@@ -2,6 +2,7 @@ node_modules/
 dist/
 coverage/
 .env
+.estatuto-index.json
 *.log
 .DS_Store
 Thumbs.db
