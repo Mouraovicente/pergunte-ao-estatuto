@@ -12,7 +12,8 @@ RAG (Retrieval-Augmented Generation) especializado em estatutos e regulamentos, 
 | `src/application/ingest.ts` | — | Caso de uso: chunk → embed → indexação idempotente |
 | `src/application/ask.ts` | — | Caso de uso: pergunta → embed → top-4 → recusa por score baixo ou resposta com citação validada |
 | `src/infrastructure/embeddings.ts` | [@xenova/transformers](https://www.npmjs.com/package/@xenova/transformers) | Embeddings locais (`Xenova/all-MiniLM-L6-v2`), sem depender de API externa |
-| `src/infrastructure/memory-store.ts` | — | Vector store in-memory (padrão, zero dependências externas) |
+| `src/infrastructure/memory-store.ts` | — | Vector store in-memory (usado nos testes e disponível via `VECTOR_STORE=memory`) |
+| `src/infrastructure/file-store.ts` | — | Vector store persistido em JSON (padrão da CLI e da API — `ingest` e `ask` funcionam em processos separados) |
 | `src/infrastructure/neo4j-store.ts` | [neo4j-driver](https://www.npmjs.com/package/neo4j-driver) | Vector store em Neo4j (opcional, via Docker) |
 | `src/infrastructure/openrouter.ts` | [OpenRouter](https://openrouter.ai/) (fetch) | Geração de resposta via LLM real, atrás de uma chave de API |
 | `src/infrastructure/fake-llm.ts` | — | LLM fake determinístico para demo sem chave de API |
@@ -49,6 +50,7 @@ flowchart TB
     subgraph Infra["src/infrastructure (adapters)"]
         Embeddings["embeddings.ts (Xenova)"]
         MemStore["memory-store.ts"]
+        FileStore["file-store.ts"]
         Neo4jStore["neo4j-store.ts (opcional)"]
         OpenRouter["openrouter.ts"]
         FakeLLM["fake-llm.ts"]
@@ -61,20 +63,23 @@ flowchart TB
     Ingest --> Chunker
     Ingest -.-> Embeddings
     Ingest -.-> MemStore
+    Ingest -.-> FileStore
     Ingest -.-> Neo4jStore
 
     Ask -.-> Embeddings
     Ask -.-> MemStore
+    Ask -.-> FileStore
     Ask -.-> Neo4jStore
     Ask --> Citations
     Ask -.-> OpenRouter
     Ask -.-> FakeLLM
 
     MemStore --> Similarity
+    FileStore --> Similarity
     Neo4jStore --> Similarity
 ```
 
-Linhas tracejadas (`-.->`) indicam dependência via *port* (interface definida em `src/application/ports.ts`): a camada de aplicação nunca importa um adapter diretamente, apenas o tipo. Quem decide qual adapter concreto usar são `src/cli.ts` e `src/api.ts`, através de `src/infrastructure/factory.ts` (lê `VECTOR_STORE` e `LLM` do ambiente).
+Linhas tracejadas (`-.->`) indicam dependência via *port* (interface definida em `src/application/ports.ts`): a camada de aplicação nunca importa um adapter diretamente, apenas o tipo. Quem decide qual adapter concreto usar são `src/cli.ts` e `src/api.ts`, através de `src/infrastructure/factory.ts` (lê `VECTOR_STORE` e `LLM` do ambiente). Quando `VECTOR_STORE` não está definido, CLI e API usam o store em arquivo (`file`, índice em `.estatuto-index.json`) — assim o `ingest` feito pela CLI é enxergado tanto por `ask` na CLI quanto pelo `POST /ask` da API, em processos separados e sem Docker.
 
 ### Fluxo de `ask`
 
@@ -89,18 +94,35 @@ Linhas tracejadas (`-.->`) indicam dependência via *port* (interface definida e
 ```bash
 npm install
 
-# 1) Gera a resposta usando o LLM fake (padrão, sem chave) e o store em memória.
-#    Atenção: com o store em memória, cada comando da CLI parte de um estado vazio —
-#    ingest e ask não compartilham dados entre execuções separadas (veja "Limitações").
+# 1) Demo pela CLI, sem chave de API e sem Docker.
+#    A CLI persiste o índice em .estatuto-index.json (store "file" por padrão),
+#    então ingest e ask funcionam em execuções/processos separados.
 npm run cli -- ingest data/estatuto-exemplo.md
 npm run cli -- ask "Qual é o mandato da diretoria?"
 
-# 2) Sobe a API HTTP (mantém o store vivo enquanto o processo roda)
+# 2) Sobe a API HTTP — ela lê o mesmo índice .estatuto-index.json gerado
+#    pelo ingest da CLI acima, então já responde com base no estatuto
 npm run start:api
 # em outro terminal:
 curl -X POST http://localhost:3000/ask \
   -H "Content-Type: application/json" \
   -d '{"question":"Qual é o mandato da diretoria?"}'
+```
+
+Saída real da demo da CLI acima (dois processos distintos, `LLM=fake`):
+
+```text
+$ npm run cli -- ingest data/estatuto-exemplo.md
+Ingeridos 40 artigo(s) de "data/estatuto-exemplo.md".
+
+$ npm run cli -- ask "Qual é o mandato da diretoria?"
+De acordo com o estatuto, [Art. 21] traz a informação aplicável a essa pergunta.
+
+Citações:
+- [Art. 21] (score: 0.58)
+
+$ npm run cli -- ask "What is the capital of France?"
+Não encontrei base no documento para responder isso.
 ```
 
 Para usar o LLM real (OpenRouter) em vez do fake:
@@ -134,7 +156,8 @@ Ver `.env.example`.
 
 | Variável | Valores | Padrão | Descrição |
 |---|---|---|---|
-| `VECTOR_STORE` | `memory` \| `neo4j` | `memory` | Qual vector store usar |
+| `VECTOR_STORE` | `memory` \| `file` \| `neo4j` | `file` (CLI e API) | Qual vector store usar |
+| `VECTOR_STORE_FILE` | caminho | `.estatuto-index.json` | Caminho do índice JSON quando `VECTOR_STORE=file` |
 | `LLM` | `fake` \| `openrouter` | `fake` | Qual gerador de respostas usar |
 | `OPENROUTER_API_KEY` | string | — | Obrigatória apenas quando `LLM=openrouter` |
 | `OPENROUTER_MODEL` | string | `openai/gpt-4o-mini` | Modelo usado na chamada ao OpenRouter |
@@ -177,7 +200,6 @@ Mesma execução, pergunta fora do escopo do documento (`"What is the capital of
 
 Escritas de propósito aqui, sem enfeitar — é um projeto de portfólio e a honestidade sobre os limites importa mais do que parecer perfeito:
 
-- **Store em memória não persiste entre execuções da CLI.** Cada chamada de `npm run cli -- ...` cria um `MemoryVectorStore` novo; `ingest` e `ask` só compartilham estado dentro do mesmo processo (por isso a API, que mantém um processo vivo, ou o modo `VECTOR_STORE=neo4j`, que persiste em disco, são as formas práticas de rodar `ingest` uma vez e `ask` várias).
 - **Calibração do threshold de recusa (0.35) com embeddings reais.** Os testes usam um `FakeEmbedder` com vetores controlados, então `0.35` funciona de forma exata e previsível neles. Com o embedder real (`Xenova/all-MiniLM-L6-v2`), medimos que frases bem formadas em português — mesmo totalmente fora do escopo do estatuto (ex.: perguntas sobre culinária ou previsão do tempo) — tendem a ter similaridade de cosseno na faixa de 0.45–0.55 com algum artigo, por causa da anisotropia natural de embeddings gerais desse porte. O guard de score rejeita com segurança perguntas sem sentido, em outro idioma ou muito curtas (validado manualmente), mas pode deixar passar para a etapa do LLM perguntas em português bem escritas porém fora de escopo. Nesse cenário, quem evita a alucinação é o guard de citação (fail-closed) combinado com um LLM real que siga a instrução do prompt de recusar quando o trecho não responde à pergunta — o que o `TemplateFakeLLM` (modo demo) não avalia, pois apenas cita mecanicamente o artigo do topo do contexto. Em produção, o `scoreThreshold` de `ask()` é um parâmetro justamente para permitir recalibrar por modelo/idioma.
 - **`Neo4jVectorStore` não usa índice vetorial nativo.** Ele busca todos os nós `:Chunk` e calcula a similaridade de cosseno em memória — adequado para um único estatuto (dezenas de artigos), não para uma base grande de documentos.
 - **Vulnerabilidades transitivas conhecidas em `@xenova/transformers`.** `npm audit` acusa CVEs em `protobufjs`, puxado indiretamente via `onnxruntime-web`/`onnx-proto`. É uma dependência transitiva da própria biblioteca de embeddings especificada para o projeto; não há entrada de dados não confiável passando por protobuf neste código, mas vale registrar.
