@@ -33,7 +33,10 @@ export function buildServer(deps: AskDeps): FastifyInstance {
 
 async function start(): Promise<void> {
   const embedder = new XenovaEmbedder();
-  const store = createStore(process.env);
+  // Padrao "file": a API le o mesmo indice JSON gerado pelo `cli ingest`,
+  // entao o fluxo ingest (CLI) -> ask (HTTP) funciona sem Docker.
+  // VECTOR_STORE=memory|neo4j continuam disponiveis via ambiente.
+  const store = createStore(process.env, 'file');
   const llm = createLLM(process.env);
 
   const app = buildServer({ embedder, store, llm });

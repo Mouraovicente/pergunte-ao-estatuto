@@ -10,9 +10,10 @@ export type EnvLike = Record<string, string | undefined>;
 /**
  * Seleciona o VectorStore de acordo com a variavel de ambiente
  * VECTOR_STORE ("memory" | "file" | "neo4j"). Quando ela nao esta
- * definida, usa o `fallback` informado pelo ponto de entrada: a CLI
- * usa "file" (para que ingest e ask funcionem em processos separados)
- * e a API usa "memory" (processo unico, vive enquanto o servidor roda).
+ * definida, usa o `fallback` informado pelo ponto de entrada: CLI e
+ * API usam "file" (compartilham o indice .estatuto-index.json, entao
+ * ingest e ask funcionam em processos separados sem Docker); "memory"
+ * permanece como fallback padrao para usos programaticos.
  */
 export function createStore(env: EnvLike = process.env, fallback: 'memory' | 'file' = 'memory'): VectorStore {
   const kind = env.VECTOR_STORE ?? fallback;
