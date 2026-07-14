@@ -16,16 +16,15 @@ function printUsage(): void {
  * Ponto de entrada da CLI. Recebe os argumentos (sem o node/script) para
  * facilitar testes; usa o processo real (env, stdout) por padrao.
  *
- * Observacao importante: com VECTOR_STORE=memory (padrao), cada execucao
- * da CLI parte de um store vazio — `ingest` e `ask` nao compartilham
- * estado entre invocacoes distintas do processo. Para persistir entre
- * execucoes, use VECTOR_STORE=neo4j (ver docker-compose.yml) ou a API
- * HTTP (src/api.ts), que mantem o store vivo enquanto o servidor roda.
+ * A CLI usa VECTOR_STORE=file por padrao (indice JSON persistido em
+ * .estatuto-index.json), para que `ingest` e `ask` funcionem em
+ * processos separados sem Docker. VECTOR_STORE=memory|neo4j continuam
+ * disponiveis via variavel de ambiente.
  */
 export async function main(argv: string[]): Promise<void> {
   const [command, ...rest] = argv;
   const embedder = new XenovaEmbedder();
-  const store = createStore(process.env);
+  const store = createStore(process.env, 'file');
 
   if (command === 'ingest') {
     const filePath = rest[0];

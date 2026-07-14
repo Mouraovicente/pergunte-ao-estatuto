@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createLLM, createStore } from '../../src/infrastructure/factory.js';
+import { FileVectorStore } from '../../src/infrastructure/file-store.js';
 import { MemoryVectorStore } from '../../src/infrastructure/memory-store.js';
 import { Neo4jVectorStore } from '../../src/infrastructure/neo4j-store.js';
 import { OpenRouterLLM } from '../../src/infrastructure/openrouter.js';
@@ -12,6 +13,18 @@ describe('createStore', () => {
 
   it('retorna MemoryVectorStore quando VECTOR_STORE=memory', () => {
     expect(createStore({ VECTOR_STORE: 'memory' })).toBeInstanceOf(MemoryVectorStore);
+  });
+
+  it('retorna FileVectorStore quando VECTOR_STORE=file', () => {
+    expect(createStore({ VECTOR_STORE: 'file' })).toBeInstanceOf(FileVectorStore);
+  });
+
+  it('usa o fallback "file" (padrao da CLI) quando VECTOR_STORE nao esta definido', () => {
+    expect(createStore({}, 'file')).toBeInstanceOf(FileVectorStore);
+  });
+
+  it('VECTOR_STORE explicito tem precedencia sobre o fallback', () => {
+    expect(createStore({ VECTOR_STORE: 'memory' }, 'file')).toBeInstanceOf(MemoryVectorStore);
   });
 
   it('retorna Neo4jVectorStore quando VECTOR_STORE=neo4j', () => {
