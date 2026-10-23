@@ -35,5 +35,9 @@
     "tsx": "^4.23.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "sharp": "^0.35.5",
+    "protobufjs": "^7.6.3"
   }
 }
