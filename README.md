@@ -23,7 +23,7 @@ RAG (Retrieval-Augmented Generation) especializado em estatutos e regulamentos, 
 | `docker-compose.yml` | Docker / Neo4j | Sobe um Neo4j local para o modo `VECTOR_STORE=neo4j` |
 | `data/estatuto-exemplo.md` | Markdown | Estatuto **fictício** de uma associação de bairro (40 artigos) usado como corpus de exemplo |
 
-Linguagem: TypeScript em modo `strict`, ESM nativo (`"type": "module"`), Node.js >= 20.
+Linguagem: TypeScript em modo `strict`, ESM nativo (`"type": "module"`), Node.js >= 22.
 
 ## Arquitetura
 
