@@ -6,7 +6,7 @@
   "license": "MIT",
   "author": "Vicente Moura",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "bin": {
     "pergunte-ao-estatuto": "./dist/cli.js"
